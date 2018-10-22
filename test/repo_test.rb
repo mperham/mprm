@@ -36,7 +36,7 @@ class RepoTest < Minitest::Test
       ].each do |filename|
         assert File.exist?(filename), "Didn't find expected file `#{filename}` in #{reporoot}"
       end
-    #ensure
+    ensure
       rm_rf srcroot
       rm_rf reporoot
     end
