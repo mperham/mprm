@@ -59,7 +59,7 @@ class RepoTest < Minitest::Test
     r.directory = srcroot
     r.origin = "Contributed Systems"
     r.label = "Faktory commercial repo"
-    r.gpg = "61C76F191E224623"
+    r.gpg = ENV['PRM_USER_KEY']
     r.gpg_sign_algorithm = "sha256"
 
     [r, reporoot, srcroot]
