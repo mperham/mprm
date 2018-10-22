@@ -36,23 +36,23 @@ class Main < Clamp::Command
   option ["-n", "--gpg_sign_algorithm"], "GPG SIGN ALGORITHM", "Digest algorithm to use for signing (e.g SHA1, SHA512, etc)", :default => false
 
   def execute
-	if version?
-		puts "PRM version: 0.2.14\n"
-		exit
-	end
+    if version?
+      puts "PRM version: #{PRM::VERSION}"
+      exit
+    end
 
-	unless type && path && release && arch
-		puts "Type, Path, Release and Arch are required arguments"
-		exit
-	end
+    unless type && path && release && arch
+      puts "Type, Path, Release and Arch are required arguments"
+      exit
+    end
 
-	if recent? && !snapshot
-		raise "--snapshot is required for --recent\n"
-	end
+    if recent? && !snapshot
+      raise "--snapshot is required for --recent"
+    end
 
-	if type == "deb" && !component
-		raise "--deb option required for the --component option!"
-	end
+    if type == "deb" && !component
+      raise "--deb option required for the --component option!"
+    end
 
     r = PRM::Repo.new
     r.release = release
@@ -61,13 +61,13 @@ class Main < Clamp::Command
     r.path = path
     r.label = label
     r.origin = origin
-	unless upload.nil?
-		r.upload = upload
-	end
+    unless upload.nil?
+      r.upload = upload
+    end
     unless gpg.nil?
       r.gpg = gpg
       r.gpg_passphrase = gpg_passphrase
-      r.gpg_sign_algorithm = gpg_sign_algorithm
+      r.gpg_sign_algorithm = gpg_sign_algorithm || 'sha256'
     end
     unless accesskey.nil?
       r.accesskey = accesskey
@@ -78,18 +78,18 @@ class Main < Clamp::Command
     unless snapshot.nil?
       r.snapshot = snapshot
     end
-	unless component.nil?
-	  r.component = component
-	end
-	if recent?
-	  r.recent = recent?
-	end
+    unless component.nil?
+      r.component = component
+    end
+    if recent?
+      r.recent = recent?
+    end
     unless directory.nil?
       r.directory = directory
     end
-	if nocache?
-		r.nocache = nocache?
-	end
+    if nocache?
+      r.nocache = nocache?
+    end
 
     r.create
   end
