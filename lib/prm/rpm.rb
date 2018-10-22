@@ -1,15 +1,20 @@
 #!/usr/bin/env ruby
 
-require 'arr-pm'
 require 'fileutils'
-require 'peach'
+require 'parallel'
 require 'digest'
 require 'zlib'
+require 'erb'
 
 module Redhat
     def build_rpm_repo(path,arch,release,gpg,silent)
-        arch.peach do |a|
-            release.peach do |r|
+      begin
+        require 'arr-pm'
+      rescue NameError, LoadError
+        puts "please install the `arr-pm` gem to support RPM packages"
+      end
+        arch.each do |a|
+          release.each do |r|
                 full_path = "#{path}/#{r}/#{a}/"
                 repo_path = "#{full_path}/repodata/"
 
@@ -22,18 +27,18 @@ module Redhat
                 end
 
                 pkgnum = 0
-                hpkgnum = Hash.new
+                hpkgnum = {}
                 Dir.glob("#{full_path}/*.rpm").each do |file|
                     pkgnum = pkgnum + 1
                     hpkgnum.store(file, pkgnum)
                 end
 
-                primary_xml = Array.new
-                filelists_xml = Array.new
-                other_xml = Array.new
+                primary_xml = []
+                filelists_xml = []
+                other_xml = []
                 package_count = 0
 
-                Dir.glob("#{full_path}/*.rpm").peach do |file|
+                Parallel.each(Dir.glob("#{full_path}/*.rpm"), :in_threads => 5) do |file|
                     package_count = package_count + 1
                     time = Time.now
                     sha256sum = Digest::SHA256.file(file).hexdigest
@@ -65,7 +70,7 @@ module Redhat
                     release_file.close
                 }
 
-                xml_data_hash = Hash.new
+                xml_data_hash = {}
                 xml_data_hash = {
                     "filelists" => {
                         "xml"   => "",
@@ -109,7 +114,7 @@ module Redhat
                     FileUtils.mv("#{repo_path}/#{file}.xml.gz", "#{repo_path}/#{xml_data_hash[file]['gz']}-#{file}.xml.gz")
                 }
 
-                repomd_xml = Array.new
+                repomd_xml = []
                 timestamp = Time.now.to_i
 
                 repomd_xml << create_repomd_xml(xml_data_hash,timestamp)
@@ -140,7 +145,7 @@ module Redhat
             return false
         end
 
-        files_moved = Array.new
+        files_moved = []
         release.each { |r|
             arch.each { |a|
                 puts a
@@ -201,7 +206,7 @@ module Redhat
 
     def create_other_xml(file, time, sha256sum, rpm, filesize, pkgmeta, start_header, end_header, pkgnum)
         init_other_data = String.new
-        init_other_data << 
+        init_other_data <<
         %Q(<package pkgid="#{sha256sum}" name="#{pkgmeta[:name]}" arch="#{pkgmeta[:arch]}">
            <version epoch="0" ver="#{pkgmeta[:version]}" rel="#{pkgmeta[:release]}"/>\n)
            init_other_data <<
@@ -242,7 +247,7 @@ module Redhat
                 name = prov[1]
                 prov[1].nil? ? flag = "" : flag = prov[1]
                 prov[2].nil? ? version = "" && release = "" : (version,release = prov[2].split(/-/))
-                provide_primary_data << 
+                provide_primary_data <<
                 "<rpm:entry name=\"#{name}\" flags=\"#{flag}\" epoch=\"0\" ver=\"#{version}\" rel=\"#{release}\"/>\n"
             end
             provide_primary_data << "</rpm:provides>\n"
@@ -258,7 +263,7 @@ module Redhat
                     name = req[0]
                 req[1].nil? ? flag = "" : flag = req[1]
                 req[2].nil? ? version = "" && release = "" : (version,release = req[2].split(/-/))
-                require_primary_data << 
+                require_primary_data <<
                 "<rpm:entry name=\"#{name}\" flags=\"#{flag}\" epoch=\"0\" ver=\"#{version}\" rel=\"#{release}\"/>\n"
             end
             require_primary_data << "</rpm:requires>\n"
@@ -287,7 +292,7 @@ module Redhat
 
         init_primary_data + files_primary_data
 
-        init_primary_data << 
+        init_primary_data <<
         %Q(        </format>\n) + %Q(</package>)
 
         return init_primary_data

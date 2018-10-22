@@ -1,16 +1,14 @@
-require 'rubygems'
 require 'fileutils'
 require 'zlib'
+require 'erb'
 require 'digest/md5'
 require 'digest/sha1'
 require 'digest/sha2'
-require 'erb'
-require 'find'
+require 'parallel'
+require 'time'
 require 'thread'
-require 'peach'
-require 'aws/s3'
-require 'arr-pm'
-require File.join(File.dirname(__FILE__), 'rpm.rb')
+
+require 'prm/rpm'
 
 module Debian
     def build_apt_repo(path, component, arch, release, label, origin, gpg, silent, nocache)
@@ -45,7 +43,7 @@ module Debian
             return false
         end
 
-        files_moved = Array.new
+        files_moved = []
         release.each { |r|
             component.each { |c|
                 arch.each { |a|
@@ -85,7 +83,7 @@ module Debian
         d = File.open(pfpath, "w+")
         write_mutex = Mutex.new
 
-        Dir.glob("#{fpath}*.deb").peach do |deb|
+        Parallel.each(Dir.glob("#{fpath}*.deb"), in_threads: 5) do |deb|
             algs = {
                 'md5' => Digest::MD5.new,
                 'sha1' => Digest::SHA1.new,
@@ -128,7 +126,7 @@ module Debian
 
             package_info = [
                 "Filename: #{npath}#{s3_compatible_encode(tdeb)}",
-                "MD5sum: #{sums['md5']}",
+                "MD5: #{sums['md5']}",
                 "SHA1: #{sums['sha1']}",
                 "SHA256: #{sums['sha256']}",
                 "Size: #{init_size}"
@@ -157,9 +155,9 @@ module Debian
     def generate_release(path,release,component,arch,label,origin)
         date = Time.now.utc
 
-        release_info = Hash.new()
+        release_info = {}
         unreasonable_array = ["Packages", "Packages.gz", "Release"]
-        component_ar = Array.new
+        component_ar = []
         Dir.glob(path + "/dists/" + release + "/*").select { |f|
             f.slice!(path + "/dists/" + release + "/")
             unless f == "Release" or f == "Release.gpg"
@@ -171,7 +169,7 @@ module Debian
             arch.each do |ar|
                 unreasonable_array.each do |unr|
                     tmp_path = "#{path}/dists/#{release}/#{c}/binary-#{ar}"
-                    tmp_hash = Hash.new
+                    tmp_hash = {}
                     filename = "#{c}/binary-#{ar}/#{unr}".chomp
 
                     byte_size = File.size("#{tmp_path}/#{unr}").to_s
@@ -230,7 +228,7 @@ module SNAP
         end
 
         release.each do |r|
-            time = Time.new
+            time = Time.now
             now = time.strftime("%Y-%m-%d-%H-%M")
             new_snap = "#{snapname}-#{now}"
 
@@ -302,61 +300,9 @@ module SNAP
     end
 end
 
-module DHO
-    def sync_to_dho(path, accesskey, secretkey,pcomponent,prelease,object_store)
-        component = pcomponent.join
-        release = prelease.join
-        puts object_store.inspect
-        AWS::S3::Base.establish_connection!(
-            :server             => object_store,
-            :use_ssl            => true,
-            :access_key_id      => accesskey,
-            :secret_access_key  => secretkey
-        )
-
-        AWS::S3::Service.buckets.each do |bucket|
-            unless bucket == path
-                AWS::S3::Bucket.create(path)
-            end
-        end
-
-        new_content = Array.new
-        Find.find(path + "/") do |object|
-            object.slice!(path + "/")
-            if (object =~ /deb$/) || (object =~ /Release$/) || (object =~ /Packages.gz$/) || (object =~ /Packages$/) || (object =~ /gpg$/)
-                f = path + "/" + object
-                new_content << object
-                AWS::S3::S3Object.store(
-                    object,
-                    open(f),
-                    path
-                )
-
-                policy = AWS::S3::S3Object.acl(object, path)
-                policy.grants = [ AWS::S3::ACL::Grant.grant(:public_read) ]
-                AWS::S3::S3Object.acl(object,path,policy)
-            end
-        end
-
-        bucket_info = AWS::S3::Bucket.find(path)
-        bucket_info.each do |obj|
-            o = obj.key
-            if (o =~ /deb$/) || (o =~ /Release$/) || (o =~ /Packages.gz$/) || (o =~ /Packages$/) || (o =~ /gpg$/)
-                unless new_content.include?(o)
-                    AWS::S3::S3Object.delete(o,path)
-                end
-            end
-        end
-        puts "Your apt repository is located at http://#{object_store}/#{path}/"
-        puts "Add the following to your apt sources.list"
-        puts "deb http://#{object_store}/#{path}/ #{release} #{component}"
-    end
-end
-
 module PRM
     class PRM::Repo
         include Debian
-        include DHO
         include SNAP
         include Redhat
 
@@ -395,9 +341,10 @@ module PRM
                 silent = false
                 build_apt_repo(path,pcomponent,parch,prelease,label,origin,gpg,silent,nocache)
             elsif "#{@type}" == "sync"
+              require 'prm/dho'
                 parch,pcomponent,prelease = _parse_vars(arch,component,release)
                 object_store = upload
-                sync_to_dho(path, accesskey, secretkey,pcomponent,prelease,object_store)
+                DHO.sync_to_dho(path, accesskey, secretkey,pcomponent,prelease,object_store)
             elsif "#{@type}" == "rpm"
                 component = nil
                 parch,pcomponent,prelease = _parse_vars(arch,component,release)
