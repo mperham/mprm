@@ -16,10 +16,7 @@ module MPRM
     attr_accessor :gpg
     attr_accessor :gpg_passphrase
     attr_accessor :gpg_sign_algorithm
-    attr_accessor :secretkey
-    attr_accessor :accesskey
     attr_accessor :directory
-    attr_accessor :recent
     attr_accessor :nocache
 
     def create

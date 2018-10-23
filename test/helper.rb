@@ -7,4 +7,4 @@ require 'arr-pm'
 require_relative './patches'
 require 'mprm'
 
-ENV['PRM_USER_KEY'] ||= "61C76F191E224623"
+ENV['PRM_USER_KEY'] ||= "support@contribsys.com"
