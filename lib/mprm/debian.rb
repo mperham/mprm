@@ -8,10 +8,8 @@ require 'parallel'
 require 'time'
 require 'thread'
 
-require 'prm/rpm'
-
 module Debian
-  def build_apt_repo(path, component, arch, release, label, origin, gpg, silent, nocache)
+  def build_apt_repo(path, component, arch, release, label, origin, gpg, nocache)
     release.each { |r|
       component.each { |c|
         arch.each { |a|
@@ -19,14 +17,12 @@ module Debian
           pfpath = fpath + "Packages"
           rfpath = fpath + "Release"
 
-          unless silent == true
-            PRM.logger.debug "Building Path: #{fpath}"
-          end
+          MPRM.logger.debug "Building Path: #{fpath}"
 
           FileUtils.mkpath(fpath)
           FileUtils.touch(pfpath)
           FileUtils.touch(rfpath)
-          generate_packages_gz(fpath,pfpath,path,rfpath,r,c,a, silent)
+          generate_packages_gz(fpath,pfpath,path,rfpath,r,c,a)
         }
       }
       generate_release(path,r,component,arch,label,origin)
@@ -39,7 +35,7 @@ module Debian
 
   def move_apt_packages(path,component,arch,release,directory)
     unless File.exist?(directory)
-      PRM.logger.debug "ERROR: #{directory} doesn't exist... not doing anything\n"
+      MPRM.logger.debug "ERROR: #{directory} doesn't exist... not doing anything\n"
       return false
     end
 
@@ -48,7 +44,7 @@ module Debian
       component.each { |c|
         arch.each { |a|
           Dir.glob(directory + "/*.deb") do |file|
-            PRM.logger.debug file
+            MPRM.logger.debug file
             if file =~ /^.*#{a}.*\.deb$/i || file =~ /^.*all.*\.deb$/i || file =~ /^.*any.*\.deb$/i
               if file =~ /^.*#{r}.*\.deb$/i
                 # Lets do this here to help mitigate packages like "asdf-123+wheezy.deb"
@@ -73,10 +69,8 @@ module Debian
     #/^.*#{arch}.*\.deb$/i
   end
 
-  def generate_packages_gz(fpath,pfpath,path,rfpath,r,c,a,silent)
-    unless silent == true
-      PRM.logger.debug "Generating Packages: #{r} : #{c} : binary-#{a}"
-    end
+  def generate_packages_gz(fpath,pfpath,path,rfpath,r,c,a)
+    MPRM.logger.debug "Generating Packages: #{r} : #{c} : binary-#{a}"
 
     npath = "dists/" + r + "/" + c + "/" + "binary-" + a + "/"
 
@@ -118,7 +112,7 @@ module Debian
           if nocache.nil?
             File.open(sum_path, 'w') { |f| f.write(sum) }
           elsif sum != stored_sum
-            PRM.logger.debug "WARN: #{s}sum mismatch on #{deb}\n"
+            MPRM.logger.debug "WARN: #{s}sum mismatch on #{deb}\n"
           end
         end
       end
@@ -211,8 +205,8 @@ module Debian
       else
         sign_cmd = "gpg --digest-algo \"#{sign_algorithm}\" -u #{gpg} --yes --output Release.gpg -b Release"
       end
-      PRM.logger.debug "Exec: #{sign_cmd}"
-      PRM.logger.debug `#{sign_cmd}`
+      MPRM.logger.debug "Exec: #{sign_cmd}"
+      MPRM.logger.debug `#{sign_cmd}`
     end
   end
 
@@ -221,153 +215,4 @@ module Debian
   end
 end
 
-module SNAP
-  def snapshot_to(path,component,release,snapname,type,recent)
-    if type != "deb"
-      PRM.logger.debug "Only deb supported"
-      return
-    end
 
-    release.each do |r|
-      time = Time.now
-      now = time.strftime("%Y-%m-%d-%H-%M")
-      new_snap = "#{snapname}-#{now}"
-
-
-      component.each do |c|
-        if !File.exist?("#{path}/dists/#{r}/#{c}")
-          PRM.logger.debug "Component doesn't exist! To snapshot you need to have an existing component\n"
-          return
-        end
-      end
-
-      if File.exist?("#{path}/dists/#{r}/#{snapname}") && !File.symlink?("#{path}/dists/#{r}/#{snapname}")
-        PRM.logger.debug "Snapshot target is a filesystem, remove it or rename your snap target"
-        return
-      end
-
-      unless File.exist?("#{path}/dists/#{r}/#{new_snap}/")
-        Dir.mkdir("#{path}/dists/#{r}/#{new_snap}")
-      end
-
-      if recent
-        component.each do |c|
-          arch_ar = arch.split(",")
-          arch_ar.each do |a|
-            source_dir = "#{path}/dists/#{r}/#{c}/binary-#{a}"
-            target_dir = "#{path}/dists/#{r}/#{new_snap}/binary-#{a}"
-            pfiles = Dir.glob("#{source_dir}/*").sort_by { |f| File.mtime(f) }
-
-            package_hash = Hash.new
-            pfiles.each do |p|
-              file = p.split(/[_]/)
-              mtime = File.mtime(p)
-              date_in_mil = mtime.to_f
-              if File.directory?(p)
-                next
-              elsif !package_hash.has_key?(file[0])
-                package_hash[file[0]] = { "name" => p, "time" => date_in_mil }
-              else
-                if date_in_mil > package_hash[file[0]]["time"]
-                  package_hash[file[0]] = { "name" => p, "time" => date_in_mil }
-                end
-              end
-            end
-
-            if !File.exist?(target_dir)
-              FileUtils.mkdir_p(target_dir)
-            end
-
-            package_hash.each do |key,value|
-              value["name"].each do |k|
-                target_file = k.split("/").last
-                FileUtils.cp(k, "#{target_dir}/#{target_file}")
-              end
-            end
-
-          end
-        end
-      else
-        FileUtils.cp_r(Dir["#{path}/dists/#{r}/#{component}/*"], "#{path}/dists/#{r}/#{new_snap}")
-      end
-
-      if File.exist?("#{path}/dists/#{r}/#{snapname}")
-        FileUtils.rm("#{path}/dists/#{r}/#{snapname}")
-      end
-
-      FileUtils.ln_s "#{new_snap}", "#{path}/dists/#{r}/#{snapname}", :force => true
-      PRM.logger.debug "Created #{snapname} snapshot of #{component}\n"
-    end
-  end
-end
-
-module PRM
-  class PRM::Repo
-    include Debian
-    include SNAP
-    include Redhat
-
-    attr_accessor :path
-    attr_accessor :type
-    attr_accessor :component
-    attr_accessor :arch
-    attr_accessor :release
-    attr_accessor :label
-    attr_accessor :origin
-    attr_accessor :gpg
-    attr_accessor :gpg_passphrase
-    attr_accessor :gpg_sign_algorithm
-    attr_accessor :secretkey
-    attr_accessor :accesskey
-    attr_accessor :snapshot
-    attr_accessor :directory
-    attr_accessor :recent
-    attr_accessor :nocache
-    attr_accessor :upload
-
-    def create
-      if "#{@type}" == "deb"
-        parch,pcomponent,prelease = _parse_vars(arch,component,release)
-        if snapshot
-          snapshot_to(path,pcomponent,prelease,snapshot,type,recent)
-          pcomponent << snapshot
-        end
-        if directory
-          silent = false
-          build_apt_repo(path,pcomponent,parch,prelease,label,origin,gpg,silent,nocache)
-          if move_apt_packages(path,pcomponent,parch,prelease,directory) == false
-            return
-          end
-        end
-        silent = false
-        build_apt_repo(path,pcomponent,parch,prelease,label,origin,gpg,silent,nocache)
-      elsif "#{@type}" == "sync"
-        require 'prm/dho'
-        parch,pcomponent,prelease = _parse_vars(arch,component,release)
-        object_store = upload
-        DHO.sync_to_dho(path, accesskey, secretkey,pcomponent,prelease,object_store)
-      elsif "#{@type}" == "rpm"
-        component = nil
-        parch,pcomponent,prelease = _parse_vars(arch,component,release)
-        if directory
-          silent = false
-          build_rpm_repo(path,parch,prelease,gpg,silent)
-          if move_rpm_packages(path,parch,prelease,directory) == false
-            return
-          end
-        end
-        silent = false
-        build_rpm_repo(path,parch,prelease,gpg,silent)
-      end
-    end
-
-    def _parse_vars(arch_ar,component_ar,release_ar)
-      arch_ar = arch.split(",")
-      if !component.nil?
-        component_ar = component.split(",")
-      end
-      release_ar = release.split(",")
-      [arch_ar,component_ar,release_ar]
-    end
-  end
-end

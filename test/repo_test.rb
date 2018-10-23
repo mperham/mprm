@@ -50,7 +50,7 @@ class RepoTest < Minitest::Test
     reporoot = "/tmp/#{type}test_#{$$}"
     mkdir_p reporoot
 
-    r = PRM::Repo.new
+    r = MPRM::Repo.new
     r.release = "all"
     r.arch = (type == "deb" ? "amd64" : "x86_64")
     r.type = type

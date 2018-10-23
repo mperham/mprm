@@ -7,12 +7,13 @@ require 'zlib'
 require 'erb'
 
 module Redhat
-  def build_rpm_repo(path,arch,release,gpg,silent)
+  def build_rpm_repo(path,arch,release,gpg)
     begin
-    require 'arr-pm'
+      require 'arr-pm'
     rescue NameError, LoadError
-    PRM.logger.debug "please install the `arr-pm` gem to support RPM packages"
+      MPRM.logger.debug "please install the `arr-pm` gem to support RPM packages"
     end
+
     arch.each do |a|
       release.each do |r|
         full_path = "#{path}/#{r}/#{a}/"
@@ -131,18 +132,18 @@ module Redhat
         unless gpg == false
           # We expect that GPG is installed and a key has already been made
           sign_cmd = "gpg -u #{gpg} --yes --detach-sign --armor #{repo_path}/repomd.xml"
-          PRM.logger.debug "Exec: #{sign_cmd}"
-          PRM.logger.debug `#{sign_cmd}`
+          MPRM.logger.debug "Exec: #{sign_cmd}"
+          MPRM.logger.debug `#{sign_cmd}`
         end
 
-        PRM.logger.debug "Built Yum repository for #{full_path}"
+        MPRM.logger.debug "Built Yum repository for #{full_path}"
       end
     end
   end
 
   def move_rpm_packages(path,arch,release,directory)
     unless File.exist?(directory)
-      PRM.logger.debug "ERROR: #{directory} doesn't exist... not doing anything"
+      MPRM.logger.debug "ERROR: #{directory} doesn't exist... not doing anything"
       return false
     end
 

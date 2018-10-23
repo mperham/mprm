@@ -1,6 +1,6 @@
 require 'logger'
 
-module PRM
+module MPRM
   class << self
     attr_accessor :logger
   end
@@ -9,5 +9,5 @@ module PRM
   self.logger.level = Logger::DEBUG
 end
 
-require 'prm/version'
-require 'prm/repo'
+require 'mprm/version'
+require 'mprm/repo'

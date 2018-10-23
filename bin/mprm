@@ -1,14 +1,7 @@
 #!/usr/bin/env ruby
 
-require 'rubygems'
 require 'clamp'
-
-begin
-  require 'prm'
-rescue LoadError
-  $: << File.expand_path(File.join(File.dirname(__FILE__), '..', 'lib'))
-  require 'prm'
-end
+require 'mprm'
 
 class Main < Clamp::Command
   option ["-v", "--version"], :flag, "Version information"
@@ -19,25 +12,16 @@ class Main < Clamp::Command
   option ["-c", "--component"], "COMPONENT", "Component to create [DEB ONLY]"
   option ["-l", "--label"], "LABEL", "Label for generated repository [DEB ONLY]"
   option ["-o", "--origin"], "ORIGIN", "Origin for generated repository [DEB ONLY]"
-  option ["-u", "--upload"], "UPLOAD", "Upload your repository to a S3 compatible object store [DEB ONLY]"
   option ["--nocache"], :flag, "Don't cache md5 sums [DEB ONLY]"
-  option ["--accesskey"], "ACCESS KEY", "DHO/S3 Access Key", :default => false
-  option ["--secretkey"], "SECRET KEY", "DHO/S3 Secret Key", :default => false
   option ["-d", "--directory"], "DIRECTORY", "Move packages from directory to target", :default => false
-  option ["-s", "--snapshot"], "COMPONENT", "Creates a snapshot of a component", :default => false
   option ["-e", "--recent"], :flag, "Snapshot the most recent unique packages", :default => false
-  option ["-g", "--generate"], :flag , "[DEPRECATED 0.2.4]" do
-	  warn "WARNING: Generate option (--generate) is deprecated\n" +
-	  "This option will be removed in next stable release (0.3.0)\n"
-  end
   option ["-k", "--gpg"], "GPG KEY",  "Sign release files with this GPG key", :default => false
-  option ["-x", "--gpg_passphrase"], "GPG PASSPHRASE", "Passphrase for GPG key [DEB ONLY]", :default => false
   option ["-x", "--gpg_passphrase"], "GPG PASSPHRASE", "Passphrase for GPG key", :default => false
-  option ["-n", "--gpg_sign_algorithm"], "GPG SIGN ALGORITHM", "Digest algorithm to use for signing (e.g SHA1, SHA512, etc)", :default => false
+  option ["-n", "--gpg_sign_algorithm"], "GPG SIGN ALGORITHM", "Digest algorithm to use for signing (e.g SHA1, SHA512, etc)", :default => "sha256"
 
   def execute
     if version?
-      puts "PRM version: #{PRM::VERSION}"
+      puts "MPRM version: #{MPRM::VERSION}"
       exit
     end
 
@@ -54,7 +38,7 @@ class Main < Clamp::Command
       raise "--deb option required for the --component option!"
     end
 
-    r = PRM::Repo.new
+    r = MPRM::Repo.new
     r.release = release
     r.arch = arch
     r.type = type
@@ -67,7 +51,7 @@ class Main < Clamp::Command
     unless gpg.nil?
       r.gpg = gpg
       r.gpg_passphrase = gpg_passphrase
-      r.gpg_sign_algorithm = gpg_sign_algorithm || 'sha256'
+      r.gpg_sign_algorithm = gpg_sign_algorithm
     end
     unless accesskey.nil?
       r.accesskey = accesskey
