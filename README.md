@@ -1,6 +1,6 @@
 # MPRM
 
-MMPRM (Mike's Package Repository Manager) is an OS-independent Package Repository tool.
+MPRM (Mike's Package Repository Manager) is an OS-independent Package Repository tool.
 It allows you to quickly build Debian and Yum Package Repositories.
 
 ## Purpose
