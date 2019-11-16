@@ -116,7 +116,7 @@ module Debian
           end
         end
       end
-      `ar p #{deb} control.tar.gz | tar zx -C tmp/#{tdeb}/`
+      MPRM.logger.debug `ar p #{deb} control.tar.gz | tar zx -C tmp/#{tdeb}/`
 
       package_info = [
         "Filename: #{npath}#{s3_compatible_encode(tdeb)}",
