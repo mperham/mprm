@@ -203,7 +203,7 @@ module Debian
       elsif gpg_passphrase
         sign_cmd = "echo \'#{gpg_passphrase}\' | gpg --digest-algo \"#{sign_algorithm}\" -u #{gpg} --passphrase-fd 0 --yes --output Release.gpg -b Release"
       else
-        sign_cmd = "gpg --digest-algo \"#{sign_algorithm}\" -u #{gpg} --yes --output Release.gpg -b Release"
+        sign_cmd = "gpg -a --digest-algo \"#{sign_algorithm}\" -u #{gpg} --yes --output Release.gpg -b Release"
       end
       MPRM.logger.debug "Exec: #{sign_cmd}"
       MPRM.logger.debug `#{sign_cmd}`
