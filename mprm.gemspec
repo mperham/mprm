@@ -11,9 +11,9 @@ Gem::Specification.new do |s|
   s.bindir	  = 'bin'
   s.executables = ['mprm']
 
-  s.add_dependency 'parallel', '>= 1.12'
-  s.add_dependency 'arr-pm', '>= 0.0.10'
-  s.add_dependency 'clamp', '>= 1.0.1'
+  s.add_dependency 'parallel', '~> 1.19'
+  s.add_dependency 'arr-pm', '~> 0.0', '>= 0.0.10'
+  s.add_dependency 'clamp', '~> 1.0', '>= 1.3.1'
 
   s.homepage    = 'https://github.com/mperham/prm'
   s.license = 'MIT'
